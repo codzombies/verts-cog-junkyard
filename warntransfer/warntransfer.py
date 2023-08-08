@@ -132,7 +132,7 @@ class WarnTransfer(commands.Cog):
                         failed += 1
                         continue
 
-                    if count % 25 == 0:
+                    if count % 1000 == 0:
                         embed = discord.Embed(
                             description="Importing ModLog cases...",
                             color=discord.Color.orange(),
