@@ -3,7 +3,7 @@ import datetime
 import discord
 from redbot.core import commands, modlog
 
-LOADING = "https://i.imgur.com/l3p6EMX.gif"
+LOADING = "http://cdn.zombiesdiscord.com/prod/zombies/media/server_icon.gif"
 
 
 class WarnTransfer(commands.Cog):
@@ -73,8 +73,7 @@ class WarnTransfer(commands.Cog):
     async def import_ws(self, ctx, msg: discord.Message, wsmodlogs: dict):
         count = 0
         failed = 0
-        for guild_id in sorted(wsmodlogs.keys(), key=int):
-            userdict = wsmodlogs[guild_id]
+        for guild_id, userdict in wsmodlogs.items():
             if not userdict:
                 continue
             guild = self.bot.get_guild(int(guild_id))
