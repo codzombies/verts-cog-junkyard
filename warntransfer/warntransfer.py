@@ -70,56 +70,78 @@ class WarnTransfer(commands.Cog):
                 embed = discord.Embed(description=res, color=discord.Color.blue())
                 await msg.edit(embed=embed)
 
-async def import_ws(self, ctx, msg: discord.Message, wsmodlogs: dict):
-    count = 0
-    failed = 0
-    update_interval = 100  # Adjust this value based on rate limits and performance
-
-    for guild_id, userdict in wsmodlogs.items():
-        if not userdict:
-            continue
-        guild = self.bot.get_guild(int(guild_id))
-        if not guild:
-            continue
-
-        # ... (same as before)
-
-        for user_id, w in userdict.items():
-            warns = w["x"]  # List of warns
-            if not warns:
+    async def import_ws(self, ctx, msg: discord.Message, wsmodlogs: dict):
+        count = 0
+        failed = 0
+        for guild_id, userdict in wsmodlogs.items():
+            if not userdict:
                 continue
-            for warning in warns:  # Each warning is a dict
-                # ... (same as before)
+            guild = self.bot.get_guild(int(guild_id))
+            if not guild:
+                continue
 
-                try:
-                    await modlog.create_case(
-                        self.bot,
-                        guild,
-                        time,
-                        wtype,
-                        int(user_id),
-                        int(author),
-                        reason,
-                        until=None,
-                        channel=None,
-                    )
-                    count += 1
+            # Disable the modlog channel to make things go faster and not spam the logs
+            try:
+                channel = await modlog.get_modlog_channel(guild)
+            except RuntimeError:
+                # Channel is already disabled or hasnt been set yet
+                channel = None
+                pass
+            else:
+                await modlog.set_modlog_channel(guild, None)
 
-                    if count % update_interval == 0:
+            for user_id, w in userdict.items():
+                warns = w["x"]  # List of warns
+                if not warns:
+                    continue
+                for warning in warns:  # Each warning is a dict
+                    t = warning["level"]
+                    if t == 2:
+                        wtype = "smute"
+                    elif t == 3:
+                        wtype = "kick"
+                    elif t == 4:
+                        wtype = "softban"
+                    elif t == 5:
+                        wtype = "ban"
+                    else:
+                        wtype = "warning"
+                    author = warning["author"]
+                    reason = warning["reason"]
+                    time = warning["time"]
+                    time = datetime.datetime.fromtimestamp(time)
+
+                    try:
+                        await modlog.create_case(
+                            self.bot,
+                            guild,
+                            time,
+                            wtype,
+                            int(user_id),
+                            int(author),
+                            reason,
+                            until=None,
+                            channel=None,
+                        )
+                        # log.info(f"ModLog {wtype} case created for {user_id}")
+                        count += 1
+                    except PermissionError:
+                        await ctx.send(
+                            f"Failed to create case for User: {user_id} in guild: {guild.name}"
+                        )
+                        failed += 1
+                        continue
+
+                    if count % 1000 == 0:
                         embed = discord.Embed(
                             description="Importing ModLog cases...",
                             color=discord.Color.orange(),
                         )
                         embed.set_thumbnail(url=LOADING)
                         embed.set_footer(text=f"{count} imported so far")
-                        await msg.edit(embed=embed)  # Update progress every N cases
-                except PermissionError:
-                    await ctx.send(
-                        f"Failed to create case for User: {user_id} in guild: {guild.name}"
-                    )
-                    failed += 1
-                    continue
+                        await msg.edit(embed=embed)
 
-        # ... (same as before)
-
-    return count, failed
+            # Re-enable the modlog channel if it was disabled
+            if channel:
+                await modlog.set_modlog_channel(guild, channel)
+        return count, failed
